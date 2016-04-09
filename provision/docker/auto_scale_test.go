@@ -1208,7 +1208,10 @@ func (s *AutoScaleSuite) TestAutoScaleConfigRunOnceRulesPerPool(c *check.C) {
 	}}
 	err := s.p.cluster.Register(node)
 	c.Assert(err, check.IsNil)
+	maxContainerCount, err := config.GetInt("docker:auto-scale:max-container-count")
+	c.Assert(err, check.IsNil)
 	config.Unset("docker:auto-scale:max-container-count")
+	defer config.Set("docker:auto-scale:max-container-count", maxContainerCount)
 	coll, err := autoScaleRuleCollection()
 	c.Assert(err, check.IsNil)
 	defer coll.Close()
