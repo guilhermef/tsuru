@@ -454,6 +454,7 @@ func (s *S) TestDelete(c *check.C) {
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/x-json-stream")
 	action := rectest.Action{
 		Action: "app-delete",
 		User:   s.user.Email,
@@ -981,7 +982,7 @@ func (s *S) TestCreateAppWithDisabledPlatformAndNotAdminUser(c *check.C) {
 	request.Header.Set("Authorization", "b "+token.GetValue())
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
-	c.Assert(recorder.Code, check.Equals, http.StatusInternalServerError)
+	c.Assert(recorder.Code, check.Equals, http.StatusBadRequest)
 	c.Assert(recorder.Body.String(), check.Equals, "Invalid platform\n")
 }
 
@@ -995,7 +996,7 @@ func (s *S) TestUpdateAppWithDescriptionOnly(c *check.C) {
 		Context: permission.Context(permission.CtxApp, a.Name),
 	})
 	b := strings.NewReader("description=my app description")
-	request, err := http.NewRequest("POST", "/apps/myapp", b)
+	request, err := http.NewRequest("PUT", "/apps/myapp", b)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Authorization", "bearer "+token.GetValue())
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1003,6 +1004,7 @@ func (s *S) TestUpdateAppWithDescriptionOnly(c *check.C) {
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/x-json-stream")
 	var gotApp app.App
 	err = s.conn.Apps().Find(bson.M{"name": "myapp"}).One(&gotApp)
 	c.Assert(err, check.IsNil)
@@ -1027,7 +1029,7 @@ func (s *S) TestUpdateAppWithPoolOnly(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer provision.RemovePool("test")
 	body := strings.NewReader("pool=test")
-	request, err := http.NewRequest("POST", "/apps/myappx", body)
+	request, err := http.NewRequest("PUT", "/apps/myappx", body)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
@@ -1051,7 +1053,7 @@ func (s *S) TestUpdateAppPoolForbiddenIfTheUserDoesNotHaveAccess(c *check.C) {
 		Context: permission.Context(permission.CtxApp, "-other-"),
 	})
 	body := strings.NewReader("pool=test")
-	request, err := http.NewRequest("POST", "/apps/myappx", body)
+	request, err := http.NewRequest("PUT", "/apps/myappx", body)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+token.GetValue())
@@ -1063,7 +1065,7 @@ func (s *S) TestUpdateAppPoolForbiddenIfTheUserDoesNotHaveAccess(c *check.C) {
 
 func (s *S) TestUpdateAppPoolWhenAppDoesNotExist(c *check.C) {
 	body := strings.NewReader("pool=test")
-	request, err := http.NewRequest("POST", "/apps/myappx", body)
+	request, err := http.NewRequest("PUT", "/apps/myappx", body)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
@@ -1091,7 +1093,7 @@ func (s *S) TestUpdateAppPlanOnly(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer s.logConn.Logs(a.Name).DropCollection()
 	body := strings.NewReader("plan=hiperplan")
-	request, err := http.NewRequest("POST", "/apps/someapp", body)
+	request, err := http.NewRequest("PUT", "/apps/someapp", body)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
@@ -1115,7 +1117,7 @@ func (s *S) TestUpdateAppPlanNotFound(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer s.logConn.Logs(a.Name).DropCollection()
 	body := strings.NewReader("plan=hiperplan")
-	request, err := http.NewRequest("POST", "/apps/someapp", body)
+	request, err := http.NewRequest("PUT", "/apps/someapp", body)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
@@ -1139,7 +1141,7 @@ func (s *S) TestUpdateAppWithoutFlag(c *check.C) {
 		Context: permission.Context(permission.CtxApp, a.Name),
 	})
 	b := strings.NewReader("{}")
-	request, err := http.NewRequest("POST", "/apps/myapp", b)
+	request, err := http.NewRequest("PUT", "/apps/myapp", b)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Authorization", "bearer "+token.GetValue())
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1158,7 +1160,7 @@ func (s *S) TestUpdateAppReturnsUnauthorizedIfNoPermissions(c *check.C) {
 	defer s.conn.Apps().Remove(bson.M{"name": a.Name})
 	token := userWithPermission(c)
 	b := strings.NewReader("description=description of my app")
-	request, err := http.NewRequest("POST", "/apps/myapp", b)
+	request, err := http.NewRequest("PUT", "/apps/myapp", b)
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Authorization", "bearer "+token.GetValue())
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -1183,7 +1185,7 @@ func (s *S) TestUpdateAppWithTeamOwnerOnly(c *check.C) {
 	defer s.conn.Teams().Remove(bson.M{"_id": team.Name})
 	c.Assert(err, check.IsNil)
 	body := strings.NewReader("teamOwner=newowner")
-	req, err := http.NewRequest("POST", "/apps/myappx", body)
+	req, err := http.NewRequest("PUT", "/apps/myappx", body)
 	c.Assert(err, check.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "bearer "+token.GetValue())
@@ -1209,7 +1211,7 @@ func (s *S) TestUpdateAppTeamOwnerToUserWhoCantBeOwner(c *check.C) {
 	token, err := nativeScheme.Login(map[string]string{"email": user.Email, "password": "123456"})
 	c.Assert(err, check.IsNil)
 	body := strings.NewReader("teamOwner=newowner")
-	req, err := http.NewRequest("POST", "/apps/myappx", body)
+	req, err := http.NewRequest("PUT", "/apps/myappx", body)
 	c.Assert(err, check.IsNil)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", "bearer "+token.GetValue())
@@ -1236,7 +1238,7 @@ func (s *S) TestUpdateAppTeamOwnerSetNewTeamToAppAddThatTeamToAppTeamList(c *che
 	defer s.conn.Teams().Remove(bson.M{"_id": team.Name})
 	c.Assert(err, check.IsNil)
 	body := strings.NewReader("teamOwner=newowner")
-	req, err := http.NewRequest("POST", "/apps/myappx", body)
+	req, err := http.NewRequest("PUT", "/apps/myappx", body)
 	c.Assert(err, check.IsNil)
 	req.Header.Set("Authorization", "bearer "+token.GetValue())
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

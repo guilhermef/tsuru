@@ -19,6 +19,7 @@ import (
 	"github.com/tsuru/tsuru/net"
 	"github.com/tsuru/tsuru/provision/docker/fix"
 	"github.com/tsuru/tsuru/scopedconfig"
+	"gopkg.in/mgo.v2"
 )
 
 const (
@@ -95,7 +96,43 @@ func UpdateContainer(pool string, c *NodeContainerConfig) error {
 
 func RemoveContainer(pool string, name string) error {
 	conf := configFor(name)
-	return conf.Remove(pool)
+	err := conf.Remove(pool)
+	if err == mgo.ErrNotFound {
+		return ErrNodeContainerNotFound
+	}
+	return err
+}
+
+func ResetImage(pool string, name string) error {
+	var poolsToReset []string
+	if pool == "" {
+		poolMap, err := LoadNodeContainersForPools(name)
+		if err != nil {
+			return err
+		}
+		for poolName := range poolMap {
+			poolsToReset = append(poolsToReset, poolName)
+		}
+	} else {
+		poolsToReset = []string{pool}
+	}
+	conf := configFor(name)
+	for _, pool = range poolsToReset {
+		var poolResult, base NodeContainerConfig
+		err := conf.LoadWithBase(pool, &base, &poolResult)
+		if err != nil {
+			return err
+		}
+		var setPool string
+		if poolResult.image() != base.image() {
+			setPool = pool
+		}
+		err = conf.SetField(setPool, "PinnedImage", "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func LoadNodeContainer(pool string, name string) (*NodeContainerConfig, error) {
@@ -115,7 +152,7 @@ func LoadNodeContainersForPools(name string) (map[string]NodeContainerConfig, er
 func LoadNodeContainersForPoolsMerge(name string, merge bool) (map[string]NodeContainerConfig, error) {
 	conf := configFor(name)
 	var result map[string]NodeContainerConfig
-	err := conf.LoadPoolsMerge(nil, &result, merge)
+	err := conf.LoadPoolsMerge(nil, &result, merge, false)
 	if err != nil {
 		return nil, err
 	}
@@ -178,6 +215,9 @@ func ensureContainersStarted(p DockerProvisioner, w io.Writer, relaunch bool, na
 			errChan <- confErr
 			return
 		}
+		if !containerConfig.valid() {
+			return
+		}
 		log.Debugf("[node containers] recreating container %q in %s [%s]", confName, node.Address, pool)
 		fmt.Fprintf(w, "relaunching node container %q in the node %s [%s]\n", confName, node.Address, pool)
 		confErr = containerConfig.create(node.Address, pool, p, relaunch)
@@ -218,9 +258,8 @@ func (c *NodeContainerConfig) EnvMap() map[string]string {
 	return envMap
 }
 
-func (c *NodeContainerConfig) ResetImage() error {
-	conf := configFor(c.Name)
-	return conf.SetField("", "PinnedImage", "")
+func (c *NodeContainerConfig) valid() bool {
+	return c.image() != ""
 }
 
 func (c *NodeContainerConfig) image() string {

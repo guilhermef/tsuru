@@ -53,6 +53,14 @@ func getApp(name string) (*app.App, error) {
 	return a, nil
 }
 
+// title: remove app
+// path: /apps/{name}
+// method: DELETE
+// produce: application/x-json-stream
+// responses:
+//   200: App removed
+//   401: Unauthorized
+//   404: Not found
 func appDelete(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -75,6 +83,7 @@ func appDelete(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	keepAliveWriter := tsuruIo.NewKeepAliveWriter(w, 30*time.Second, "")
 	defer keepAliveWriter.Stop()
 	writer := &tsuruIo.SimpleJsonMessageEncoderWriter{Encoder: json.NewEncoder(keepAliveWriter)}
+	w.Header().Set("Content-Type", "application/x-json-stream")
 	err = app.Delete(&a, writer)
 	if err != nil {
 		writer.Encode(tsuruIo.SimpleJsonMessage{Error: err.Error()})
@@ -127,6 +136,14 @@ contextsLoop:
 	return filter
 }
 
+// title: app list
+// path: /apps
+// method: GET
+// produce: application/json
+// responses:
+//   200: List apps
+//   204: No content
+//   401: Unauthorized
 func appList(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -188,6 +205,14 @@ func appList(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return json.NewEncoder(w).Encode(miniApps)
 }
 
+// title: app info
+// path: /apps/{name}
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
+//   401: Unauthorized
+//   404: Not found
 func appInfo(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -211,6 +236,17 @@ func appInfo(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return json.NewEncoder(w).Encode(&a)
 }
 
+// title: app create
+// path: /apps
+// method: POST
+// consume: application/x-www-form-urlencoded
+// produce: application/json
+// responses:
+//   201: App created
+//   400: Invalid data
+//   401: Unauthorized
+//   403: Quota exceeded
+//   409: App already exists
 func createApp(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	a := app.App{
 		TeamOwner:   r.FormValue("teamOwner"),
@@ -244,7 +280,7 @@ func createApp(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 		canUsePlat := permission.Check(t, permission.PermPlatformUpdate) ||
 			permission.Check(t, permission.PermPlatformCreate)
 		if !canUsePlat {
-			return app.InvalidPlatformError
+			return &errors.HTTP{Code: http.StatusBadRequest, Message: app.InvalidPlatformError.Error()}
 		}
 	}
 	rec.Log(u.Email, "create-app", "app="+a.Name, "platform="+a.Platform, "plan="+a.Plan.Name, "description="+a.Description)
@@ -272,7 +308,7 @@ func createApp(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 			}
 		}
 		if err == app.InvalidPlatformError {
-			return &errors.HTTP{Code: http.StatusNotFound, Message: err.Error()}
+			return &errors.HTTP{Code: http.StatusBadRequest, Message: err.Error()}
 		}
 		return err
 	}
@@ -294,6 +330,15 @@ func createApp(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return nil
 }
 
+// title: app update
+// path: /apps/{name}
+// method: PUT
+// consume: application/x-www-form-urlencoded
+// produce: application/x-json-stream
+// responses:
+//   200: App updated
+//   401: Unauthorized
+//   404: Not found
 func updateApp(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	updateData := app.App{
 		TeamOwner:   r.FormValue("teamOwner"),
@@ -364,6 +409,7 @@ func updateApp(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	}
 	keepAliveWriter := tsuruIo.NewKeepAliveWriter(w, 30*time.Second, "")
 	defer keepAliveWriter.Stop()
+	w.Header().Set("Content-Type", "application/x-json-stream")
 	writer := &tsuruIo.SimpleJsonMessageEncoderWriter{Encoder: json.NewEncoder(keepAliveWriter)}
 	err = a.Update(updateData, writer)
 	if err == app.ErrPlanNotFound {

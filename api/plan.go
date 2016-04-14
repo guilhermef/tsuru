@@ -16,6 +16,15 @@ import (
 	"github.com/tsuru/tsuru/router"
 )
 
+// title: plan create
+// path: /plans
+// method: POST
+// consume: application/x-www-form-urlencoded
+// responses:
+//   201: Plan created
+//   400: Invalid data
+//   401: Unauthorized
+//   409: Plan already exists
 func addPlan(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	cpuShare, _ := strconv.Atoi(r.FormValue("cpushare"))
 	isDefault, _ := strconv.ParseBool(r.FormValue("default"))
@@ -58,15 +67,33 @@ func addPlan(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return err
 }
 
+// title: plan list
+// path: /plans
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
+//   204: No content
 func listPlans(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	plans, err := app.PlansList()
 	if err != nil {
 		return err
 	}
+	if len(plans) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return nil
+	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(plans)
 }
 
+// title: remove plan
+// path: /plans/{name}
+// method: DELETE
+// responses:
+//   200: Plan removed
+//   401: Unauthorized
+//   404: Plan not found
 func removePlan(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	allowed := permission.Check(t, permission.PermPlanDelete)
 	if !allowed {
@@ -84,7 +111,7 @@ func removePlan(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 }
 
 // title: router list
-// path: /plan/routers
+// path: /plans/routers
 // method: GET
 // produce: application/json
 // responses:
