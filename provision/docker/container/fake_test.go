@@ -1,4 +1,4 @@
-// Copyright 2015 tsuru authors. All rights reserved.
+// Copyright 2016 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -8,6 +8,7 @@ import (
 	"github.com/tsuru/docker-cluster/cluster"
 	"github.com/tsuru/tsuru/db"
 	"github.com/tsuru/tsuru/db/storage"
+	"github.com/tsuru/tsuru/provision"
 )
 
 type push struct {
@@ -20,6 +21,7 @@ type fakeDockerProvisioner struct {
 	cluster    *cluster.Cluster
 	pushes     []push
 	pushErrors chan error
+	limiter    provision.LocalLimiter
 }
 
 func newFakeDockerProvisioner(servers ...string) (*fakeDockerProvisioner, error) {
@@ -65,4 +67,8 @@ func (p *fakeDockerProvisioner) PushImage(name, tag string) error {
 	default:
 	}
 	return nil
+}
+
+func (p *fakeDockerProvisioner) ActionLimiter() provision.ActionLimiter {
+	return &p.limiter
 }

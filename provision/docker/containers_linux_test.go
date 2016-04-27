@@ -1,4 +1,4 @@
-// Copyright 2015 tsuru authors. All rights reserved.
+// Copyright 2016 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -52,8 +52,8 @@ func (s *S) TestRebalanceContainersManyAppsSegStress(c *check.C) {
 		appInstance := provisiontest.NewFakeApp(appName, "python", 0)
 		defer p.Destroy(appInstance)
 		p.Provision(appInstance)
-		imageId, err := appCurrentImageName(appInstance.GetName())
-		c.Assert(err, check.IsNil)
+		imageId, aErr := appCurrentImageName(appInstance.GetName())
+		c.Assert(aErr, check.IsNil)
 		var chosenNode string
 		for j := range variation {
 			if i < (maxContainers*variation[j])/100 {
