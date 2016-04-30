@@ -895,6 +895,7 @@ func (s *AuthSuite) TestListKeysHandler(c *check.C) {
 	handler := RunServer(true)
 	handler.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	got := map[string]string{}
 	err = json.NewDecoder(recorder.Body).Decode(&got)
 	c.Assert(err, check.IsNil)
@@ -1234,10 +1235,13 @@ func (s *AuthSuite) TestAuthScheme(c *check.C) {
 	oldScheme := app.AuthScheme
 	defer func() { app.AuthScheme = oldScheme }()
 	app.AuthScheme = TestScheme{}
-	request, _ := http.NewRequest("GET", "/auth/scheme", nil)
-	recorder := httptest.NewRecorder()
-	err := authScheme(recorder, request)
+	request, err := http.NewRequest("GET", "/auth/scheme", nil)
 	c.Assert(err, check.IsNil)
+	recorder := httptest.NewRecorder()
+	m := RunServer(true)
+	m.ServeHTTP(recorder, request)
+	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	var parsed map[string]interface{}
 	err = json.NewDecoder(recorder.Body).Decode(&parsed)
 	c.Assert(err, check.IsNil)
@@ -1257,9 +1261,12 @@ func (s *AuthSuite) TestRegenerateAPITokenHandler(c *check.C) {
 	defer conn.Tokens().Remove(bson.M{"token": token.GetValue()})
 	request, err := http.NewRequest("POST", "/users/api-key", nil)
 	c.Assert(err, check.IsNil)
+	request.Header.Set("Authorization", "b "+token.GetValue())
 	recorder := httptest.NewRecorder()
-	err = regenerateAPIToken(recorder, request, token)
-	c.Assert(err, check.IsNil)
+	m := RunServer(true)
+	m.ServeHTTP(recorder, request)
+	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	var got string
 	err = json.NewDecoder(recorder.Body).Decode(&got)
 	c.Assert(err, check.IsNil)
@@ -1344,9 +1351,12 @@ func (s *AuthSuite) TestShowAPITokenForUserWithToken(c *check.C) {
 	defer conn.Tokens().Remove(bson.M{"token": token.GetValue()})
 	request, err := http.NewRequest("GET", "/users/api-key", nil)
 	c.Assert(err, check.IsNil)
+	request.Header.Set("Authorization", "b "+token.GetValue())
 	recorder := httptest.NewRecorder()
-	err = showAPIToken(recorder, request, token)
-	c.Assert(err, check.IsNil)
+	m := RunServer(true)
+	m.ServeHTTP(recorder, request)
+	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	var got string
 	err = json.NewDecoder(recorder.Body).Decode(&got)
 	c.Assert(err, check.IsNil)
@@ -1418,6 +1428,7 @@ func (s *AuthSuite) TestListUsers(c *check.C) {
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	var users []apiUser
 	err = json.NewDecoder(recorder.Body).Decode(&users)
 	c.Assert(err, check.IsNil)
@@ -1461,6 +1472,38 @@ func (s *AuthSuite) TestListUsersFilterByRole(c *check.C) {
 	userRoles := expectedUser.Roles
 	expectedRole := userRoles[0].Name
 	url := fmt.Sprintf("/users?role=%s", expectedRole)
+	request, err := http.NewRequest("GET", url, nil)
+	c.Assert(err, check.IsNil)
+	request.Header.Add("Authorization", "bearer "+s.token.GetValue())
+	recorder := httptest.NewRecorder()
+	m := RunServer(true)
+	m.ServeHTTP(recorder, request)
+	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	var users []apiUser
+	err = json.NewDecoder(recorder.Body).Decode(&users)
+	c.Assert(err, check.IsNil)
+	c.Assert(users, check.HasLen, 1)
+	receivedUser := users[0]
+	c.Assert(expectedUser.Email, check.Equals, receivedUser.Email)
+}
+
+func (s *AuthSuite) TestListUsersFilterByRoleAndContext(c *check.C) {
+	token := userWithPermission(c, permission.Permission{
+		Scheme:  permission.PermAppCreate,
+		Context: permission.Context(permission.CtxTeam, s.team.Name),
+	}, permission.Permission{
+		Scheme:  permission.PermAppCreate,
+		Context: permission.Context(permission.CtxTeam, s.team2.Name),
+	})
+	expectedUser, err := token.User()
+	c.Assert(err, check.IsNil)
+	userRoles := expectedUser.Roles
+	expectedRole := userRoles[1].Name
+	otherUser := &auth.User{Email: "groundcontrol@majortom.com", Password: "123456", Quota: quota.Unlimited}
+	_, err = nativeScheme.Create(otherUser)
+	c.Assert(err, check.IsNil)
+	otherUser.AddRole(expectedRole, s.team.Name)
+	url := fmt.Sprintf("/users?role=%s&context=%s", expectedRole, s.team2.Name)
 	request, err := http.NewRequest("GET", url, nil)
 	c.Assert(err, check.IsNil)
 	request.Header.Add("Authorization", "bearer "+s.token.GetValue())

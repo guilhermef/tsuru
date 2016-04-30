@@ -211,6 +211,7 @@ func RunServer(dry bool) http.Handler {
 	m.Add("1.0", "Post", "/swap", AuthorizationRequiredHandler(swap))
 
 	m.Add("1.0", "Get", "/healthcheck/", http.HandlerFunc(healthcheck))
+	m.Add("1.0", "Get", "/healthcheck", http.HandlerFunc(healthcheck))
 
 	m.Add("1.0", "Get", "/iaas/machines", AuthorizationRequiredHandler(machinesList))
 	m.Add("1.0", "Delete", "/iaas/machines/{machine_id}", AuthorizationRequiredHandler(machineDestroy))
@@ -262,6 +263,7 @@ func RunServer(dry bool) http.Handler {
 	n.UseHandler(m)
 	n.Use(negroni.HandlerFunc(contextClearerMiddleware))
 	n.Use(negroni.HandlerFunc(flushingWriterMiddleware))
+	n.Use(negroni.HandlerFunc(setRequestIDHeaderMiddleware))
 	n.Use(negroni.HandlerFunc(errorHandlingMiddleware))
 	n.Use(negroni.HandlerFunc(setVersionHeadersMiddleware))
 	n.Use(negroni.HandlerFunc(authTokenMiddleware))

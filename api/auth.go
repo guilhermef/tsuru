@@ -305,7 +305,14 @@ func removeKeyFromUser(w http.ResponseWriter, r *http.Request, t auth.Token) err
 	return err
 }
 
-// listKeys list user's keys
+// title: list keys
+// path: /users/keys
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
+//   400: Invalid data
+//   401: Unauthorized
 func listKeys(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -318,12 +325,10 @@ func listKeys(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	if err != nil {
 		return err
 	}
+	w.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(keys)
 }
 
-// removeUser removes the user from the database and from repository server
-//
-// If the user is the only one in a team an error will be returned.
 func removeUser(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -359,15 +364,30 @@ type schemeData struct {
 	Data auth.SchemeInfo `json:"data"`
 }
 
+// title: get auth scheme
+// path: /auth/scheme
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
 func authScheme(w http.ResponseWriter, r *http.Request) error {
 	info, err := app.AuthScheme.Info()
 	if err != nil {
 		return err
 	}
 	data := schemeData{Name: app.AuthScheme.Name(), Data: info}
+	w.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(data)
 }
 
+// title: regenerate token
+// path: /users/api-key
+// method: POST
+// produce: application/json
+// responses:
+//   200: OK
+//   401: Unauthorized
+//   404: User not found
 func regenerateAPIToken(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -387,9 +407,18 @@ func regenerateAPIToken(w http.ResponseWriter, r *http.Request, t auth.Token) er
 	if err != nil {
 		return err
 	}
+	w.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(apiKey)
 }
 
+// title: show token
+// path: /users/api-key
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
+//   401: Unauthorized
+//   404: User not found
 func showAPIToken(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {
@@ -409,6 +438,7 @@ func showAPIToken(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	if err != nil {
 		return err
 	}
+	w.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(apiKey)
 }
 
@@ -481,9 +511,17 @@ func createApiUser(perms []permission.Permission, user *auth.User, roleMap map[s
 	}, nil
 }
 
+// title: user list
+// path: /users
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
+//   401: Unauthorized
 func listUsers(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	userEmail := r.URL.Query().Get("userEmail")
 	roleName := r.URL.Query().Get("role")
+	contextValue := r.URL.Query().Get("context")
 	users, err := auth.ListUsers()
 	if err != nil {
 		return err
@@ -512,15 +550,30 @@ func listUsers(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 		if roleName != "" {
 			for _, role := range usrData.Roles {
 				if role.Name == roleName {
-					apiUsers = append(apiUsers, *usrData)
-					break
+					println(role.Name, role.ContextValue)
+					if contextValue != "" && role.ContextValue == contextValue {
+						apiUsers = append(apiUsers, *usrData)
+						break
+					}
+					if contextValue == "" {
+						apiUsers = append(apiUsers, *usrData)
+						break
+					}
 				}
 			}
 		}
 	}
+	w.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(apiUsers)
 }
 
+// title: user info
+// path: /users/info
+// method: GET
+// produce: application/json
+// responses:
+//   200: OK
+//   401: Unauthorized
 func userInfo(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	user, err := t.User()
 	if err != nil {

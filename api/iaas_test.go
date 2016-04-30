@@ -1,16 +1,17 @@
-// Copyright 2015 tsuru authors. All rights reserved.
+// Copyright 2016 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strings"
 
+	"github.com/cezarsa/form"
 	"github.com/tsuru/tsuru/iaas"
 	"gopkg.in/check.v1"
 )
@@ -50,6 +51,7 @@ func (s *S) TestMachinesList(c *check.C) {
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	var machines []iaas.Machine
 	err = json.NewDecoder(recorder.Body).Decode(&machines)
 	c.Assert(err, check.IsNil)
@@ -125,6 +127,7 @@ func (s *S) TestTemplateList(c *check.C) {
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
+	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
 	var templates []iaas.Template
 	err = json.Unmarshal(recorder.Body.Bytes(), &templates)
 	c.Assert(err, check.IsNil)
@@ -153,12 +156,12 @@ func (s *S) TestTemplateCreate(c *check.C) {
 			{Name: "a", Value: "b"},
 		}),
 	}
-	bodyData, err := json.Marshal(data)
+	v, err := form.EncodeToValues(&data)
 	c.Assert(err, check.IsNil)
-	body := bytes.NewBuffer(bodyData)
 	recorder := httptest.NewRecorder()
-	request, err := http.NewRequest("POST", "/iaas/templates", body)
+	request, err := http.NewRequest("POST", "/iaas/templates", strings.NewReader(v.Encode()))
 	c.Assert(err, check.IsNil)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
@@ -173,6 +176,17 @@ func (s *S) TestTemplateCreate(c *check.C) {
 		{Name: "x", Value: "y"},
 		{Name: "a", Value: "b"},
 	}))
+}
+
+func (s *S) TestTemplateCreateBadRequest(c *check.C) {
+	iaas.RegisterIaasProvider("my-iaas", newTestIaaS)
+	recorder := httptest.NewRecorder()
+	request, err := http.NewRequest("POST", "/iaas/templates", nil)
+	c.Assert(err, check.IsNil)
+	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
+	m := RunServer(true)
+	m.ServeHTTP(recorder, request)
+	c.Assert(recorder.Code, check.Equals, http.StatusBadRequest)
 }
 
 func (s *S) TestTemplateDestroy(c *check.C) {
@@ -219,12 +233,12 @@ func (s *S) TestTemplateUpdate(c *check.C) {
 			{Name: "z", Value: "9"},
 		}),
 	}
-	bodyData, err := json.Marshal(tplParam)
+	v, err := form.EncodeToValues(&tplParam)
 	c.Assert(err, check.IsNil)
-	body := bytes.NewBuffer(bodyData)
 	recorder := httptest.NewRecorder()
-	request, err := http.NewRequest("PUT", "/iaas/templates/my-tpl", body)
+	request, err := http.NewRequest("PUT", "/iaas/templates/my-tpl", strings.NewReader(v.Encode()))
 	c.Assert(err, check.IsNil)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
@@ -251,15 +265,26 @@ func (s *S) TestTemplateUpdateNotFound(c *check.C) {
 			{Name: "z", Value: "9"},
 		}),
 	}
-	bodyData, err := json.Marshal(tplParam)
+	v, err := form.EncodeToValues(&tplParam)
 	c.Assert(err, check.IsNil)
-	body := bytes.NewBuffer(bodyData)
 	recorder := httptest.NewRecorder()
-	request, err := http.NewRequest("PUT", "/iaas/templates/my-tpl", body)
+	request, err := http.NewRequest("PUT", "/iaas/templates/my-tpl", strings.NewReader(v.Encode()))
 	c.Assert(err, check.IsNil)
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusNotFound)
 	c.Assert(recorder.Body.String(), check.Equals, "template not found\n")
+}
+
+func (s *S) TestTemplateUpdateBadRequest(c *check.C) {
+	iaas.RegisterIaasProvider("my-iaas", newTestIaaS)
+	recorder := httptest.NewRecorder()
+	request, err := http.NewRequest("PUT", "/iaas/templates/my-tpl", nil)
+	c.Assert(err, check.IsNil)
+	request.Header.Set("Authorization", "bearer "+s.token.GetValue())
+	m := RunServer(true)
+	m.ServeHTTP(recorder, request)
+	c.Assert(recorder.Code, check.Equals, http.StatusBadRequest)
 }
