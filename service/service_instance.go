@@ -72,7 +72,7 @@ func (si *ServiceInstance) GetIdentifier() string {
 
 // MarshalJSON marshals the ServiceName in json format.
 func (si *ServiceInstance) MarshalJSON() ([]byte, error) {
-	info, err := si.Info()
+	info, err := si.Info("")
 	if err != nil {
 		info = nil
 	}
@@ -89,12 +89,12 @@ func (si *ServiceInstance) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&data)
 }
 
-func (si *ServiceInstance) Info() (map[string]string, error) {
+func (si *ServiceInstance) Info(requestID string) (map[string]string, error) {
 	endpoint, err := si.Service().getClient("production")
 	if err != nil {
 		return nil, errors.New("endpoint does not exists")
 	}
-	result, err := endpoint.Info(si)
+	result, err := endpoint.Info(si, requestID)
 	if err != nil {
 		return nil, err
 	}
@@ -246,12 +246,12 @@ func (si *ServiceInstance) UnbindUnit(app bind.App, unit bind.Unit) error {
 }
 
 // Status returns the service instance status.
-func (si *ServiceInstance) Status() (string, error) {
+func (si *ServiceInstance) Status(requestID string) (string, error) {
 	endpoint, err := si.Service().getClient("production")
 	if err != nil {
 		return "", err
 	}
-	return endpoint.Status(si)
+	return endpoint.Status(si, requestID)
 }
 
 func (si *ServiceInstance) Grant(teamName string) error {
@@ -302,7 +302,7 @@ func validateServiceInstanceName(service string, instance string) error {
 	return nil
 }
 
-func CreateServiceInstance(instance ServiceInstance, service *Service, user *auth.User) error {
+func CreateServiceInstance(instance ServiceInstance, service *Service, user *auth.User, requestID string) error {
 	err := validateServiceInstanceName(service.Name, instance.Name)
 	if err != nil {
 		return err
@@ -314,7 +314,7 @@ func CreateServiceInstance(instance ServiceInstance, service *Service, user *aut
 	instance.Teams = []string{instance.TeamOwner}
 	actions := []*action.Action{&createServiceInstance, &insertServiceInstance}
 	pipeline := action.NewPipeline(actions...)
-	return pipeline.Execute(*service, instance, user.Email)
+	return pipeline.Execute(*service, instance, user.Email, requestID)
 }
 
 func UpdateService(si *ServiceInstance) error {

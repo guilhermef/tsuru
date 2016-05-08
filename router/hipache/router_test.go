@@ -166,6 +166,15 @@ func (s *S) TestShouldBeRegistered(c *check.C) {
 	c.Assert(ok, check.Equals, true)
 }
 
+func (s *S) TestShouldBeRegisteredAsPlanb(c *check.C) {
+	config.Set("routers:myplanb:type", "planb")
+	defer config.Unset("routers:myplanb:type")
+	r, err := router.Get("myplanb")
+	c.Assert(err, check.IsNil)
+	_, ok := r.(*hipacheRouter)
+	c.Assert(ok, check.Equals, true)
+}
+
 func (s *S) TestShouldBeRegisteredAllowingPrefixes(c *check.C) {
 	config.Set("routers:inst1:type", "hipache")
 	config.Set("routers:inst2:type", "hipache")
@@ -661,4 +670,17 @@ func (s *S) TestSwap(c *check.C) {
 	backend2Routes, err := conn.LRange("frontend:b1.golang.org", 0, -1).Result()
 	c.Assert(err, check.IsNil)
 	c.Assert([]string{"b1", addr2.String()}, check.DeepEquals, backend2Routes)
+}
+
+func (s *S) TestAddRouteAfterCorruptedRedis(c *check.C) {
+	backend1 := "b1"
+	r := hipacheRouter{prefix: "hipache"}
+	err := r.AddBackend(backend1)
+	c.Assert(err, check.IsNil)
+	redisConn, err := r.connect()
+	c.Assert(err, check.IsNil)
+	clearRedisKeys("frontend:*", redisConn, c)
+	addr1, _ := url.Parse("http://127.0.0.1")
+	err = r.AddRoute(backend1, addr1)
+	c.Assert(err, check.Equals, router.ErrBackendNotFound)
 }

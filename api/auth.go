@@ -148,6 +148,15 @@ func resetPassword(w http.ResponseWriter, r *http.Request) error {
 	return managed.ResetPassword(u, token)
 }
 
+// title: team create
+// path: /teams
+// method: POST
+// consume: application/x-www-form-urlencoded
+// responses:
+//   201: Team created
+//   400: Invalid data
+//   401: Unauthorized
+//   409: Team already exists
 func createTeam(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	allowed := permission.Check(t, permission.PermTeamCreate)
 	if !allowed {
@@ -172,6 +181,14 @@ func createTeam(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return err
 }
 
+// title: remove team
+// path: /teams/{name}
+// method: DELETE
+// responses:
+//   200: Team removed
+//   401: Unauthorized
+//   403: Forbidden
+//   404: Not found
 func removeTeam(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	name := r.URL.Query().Get(":name")
 	allowed := permission.Check(t, permission.PermTeamDelete,
@@ -195,6 +212,14 @@ func removeTeam(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return nil
 }
 
+// title: team list
+// path: /teams
+// method: GET
+// produce: application/json
+// responses:
+//   200: List teams
+//   204: No content
+//   401: Unauthorized
 func teamList(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	rec.Log(t.GetUserName(), "list-teams")
 	permsForTeam := permission.PermissionRegistry.PermissionsWithContextType(permission.CtxTeam)
@@ -232,18 +257,7 @@ func teamList(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	b, err := json.Marshal(result)
-	if err != nil {
-		return err
-	}
-	n, err := w.Write(b)
-	if err != nil {
-		return err
-	}
-	if n != len(b) {
-		return &errors.HTTP{Code: http.StatusInternalServerError, Message: "Failed to write response body."}
-	}
-	return nil
+	return json.NewEncoder(w).Encode(result)
 }
 
 // AddKeyToUser adds a key to a user.
@@ -329,6 +343,13 @@ func listKeys(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	return json.NewEncoder(w).Encode(keys)
 }
 
+// title: remove user
+// path: /users
+// method: DELETE
+// responses:
+//   200: User removed
+//   401: Unauthorized
+//   404: Not found
 func removeUser(w http.ResponseWriter, r *http.Request, t auth.Token) error {
 	u, err := t.User()
 	if err != nil {

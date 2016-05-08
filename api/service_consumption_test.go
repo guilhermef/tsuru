@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 
 	"github.com/tsuru/config"
+	"github.com/tsuru/tsuru/api/context"
 	"github.com/tsuru/tsuru/app"
 	"github.com/tsuru/tsuru/auth"
 	"github.com/tsuru/tsuru/db"
@@ -112,7 +113,10 @@ func makeRequestToCreateInstanceHandler(params map[string]string, c *check.C) (*
 }
 
 func (s *ConsumptionSuite) TestCreateInstanceWithPlan(c *check.C) {
+	requestIDHeader := "RequestID"
+	config.Set("request-id-header", requestIDHeader)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Header.Get(requestIDHeader), check.Equals, "test")
 		w.Write([]byte(`{"DATABASE_HOST":"localhost"}`))
 	}))
 	defer ts.Close()
@@ -131,6 +135,7 @@ func (s *ConsumptionSuite) TestCreateInstanceWithPlan(c *check.C) {
 	}
 	recorder, request := makeRequestToCreateInstanceHandler(params, c)
 	request.Header.Set("Authorization", "b "+s.token.GetValue())
+	request.Header.Set(requestIDHeader, "test")
 	m := RunServer(true)
 	m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusCreated)
@@ -1100,7 +1105,12 @@ func makeRequestToStatusHandler(service string, instance string, c *check.C) (*h
 }
 
 func (s *ConsumptionSuite) TestServiceInstanceStatusHandler(c *check.C) {
+	requestIDHeader := "RequestID"
+	config.Set("request-id-header", requestIDHeader)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/resources/my_nosql/status" {
+			c.Assert(r.Header.Get(requestIDHeader), check.Equals, "test")
+		}
 		w.WriteHeader(http.StatusNoContent)
 		w.Write([]byte(`Service instance "my_nosql" is up`))
 	}))
@@ -1114,6 +1124,7 @@ func (s *ConsumptionSuite) TestServiceInstanceStatusHandler(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer service.DeleteInstance(&si)
 	recorder, request := makeRequestToStatusHandler("mongodb", "my_nosql", c)
+	context.SetRequestID(request, requestIDHeader, "test")
 	err = serviceInstanceStatus(recorder, request, s.token)
 	c.Assert(err, check.IsNil)
 	c.Assert(recorder.Body.String(), check.Equals, "Service instance \"my_nosql\" is up")
@@ -1197,6 +1208,8 @@ func makeRequestToInfoHandler(service, instance, token string, c *check.C) (*htt
 }
 
 func (s *ConsumptionSuite) TestServiceInstanceInfoHandler(c *check.C) {
+	requestIDHeader := "RequestID"
+	config.Set("request-id-header", requestIDHeader)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/resources/my_nosql" {
 			w.Write([]byte(`[{"label": "key", "value": "value"}, {"label": "key2", "value": "value2"}]`))
@@ -1204,6 +1217,7 @@ func (s *ConsumptionSuite) TestServiceInstanceInfoHandler(c *check.C) {
 		if r.Method == "GET" && r.URL.Path == "/resources/plans" {
 			w.Write([]byte(`[{"name": "ignite", "description": "some value"}, {"name": "small", "description": "not space left for you"}]`))
 		}
+		c.Assert(r.Header.Get(requestIDHeader), check.Equals, "test")
 	}))
 	defer ts.Close()
 	srv := service.Service{Name: "mongodb", Teams: []string{s.team.Name}, Endpoint: map[string]string{"production": ts.URL}}
@@ -1223,6 +1237,7 @@ func (s *ConsumptionSuite) TestServiceInstanceInfoHandler(c *check.C) {
 	c.Assert(err, check.IsNil)
 	defer service.DeleteInstance(&si)
 	recorder, request := makeRequestToInfoHandler("mongodb", "my_nosql", s.token.GetValue(), c)
+	request.Header.Set(requestIDHeader, "test")
 	s.m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
 	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")
@@ -1466,7 +1481,10 @@ func (s *ConsumptionSuite) TestGetServiceInstanceOrError(c *check.C) {
 }
 
 func (s *ConsumptionSuite) TestServicePlansHandler(c *check.C) {
+	requestIDHeader := "RequestID"
+	config.Set("request-id-header", requestIDHeader)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.Assert(r.Header.Get(requestIDHeader), check.Equals, "test")
 		content := `[{"name": "ignite", "description": "some value"}, {"name": "small", "description": "not space left for you"}]`
 		w.Write([]byte(content))
 	}))
@@ -1479,6 +1497,7 @@ func (s *ConsumptionSuite) TestServicePlansHandler(c *check.C) {
 	c.Assert(err, check.IsNil)
 	request.Header.Set("Authorization", "b "+s.token.GetValue())
 	recorder := httptest.NewRecorder()
+	request.Header.Set(requestIDHeader, "test")
 	s.m.ServeHTTP(recorder, request)
 	c.Assert(recorder.Code, check.Equals, http.StatusOK)
 	c.Assert(recorder.Header().Get("Content-Type"), check.Equals, "application/json")

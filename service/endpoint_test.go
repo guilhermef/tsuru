@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/tsuru/config"
 	"github.com/tsuru/tsuru/provision/provisiontest"
 	"gopkg.in/check.v1"
 )
@@ -76,12 +77,13 @@ func (h *TestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *S) TestEndpointCreate(c *check.C) {
+	config.Set("request-id-header", "Request-ID")
 	h := TestHandler{}
 	ts := httptest.NewServer(&h)
 	defer ts.Close()
 	instance := ServiceInstance{Name: "my-redis", ServiceName: "redis", TeamOwner: "theteam", Description: "xyz"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	err := client.Create(&instance, "my@user")
+	err := client.Create(&instance, "my@user", "Request-ID")
 	c.Assert(err, check.IsNil)
 	expectedURL := "/resources"
 	h.Lock()
@@ -96,6 +98,7 @@ func (s *S) TestEndpointCreate(c *check.C) {
 		"team":        {"theteam"},
 		"description": {"xyz"},
 	})
+	c.Assert("Request-ID", check.Equals, h.request.Header.Get("Request-ID"))
 	c.Assert("application/x-www-form-urlencoded", check.DeepEquals, h.request.Header.Get("Content-Type"))
 	c.Assert("application/json", check.Equals, h.request.Header.Get("Accept"))
 	c.Assert("Basic dXNlcjphYmNkZQ==", check.Equals, h.request.Header.Get("Authorization"))
@@ -113,7 +116,7 @@ func (s *S) TestEndpointCreatePlans(c *check.C) {
 		TeamOwner:   "myteam",
 	}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	err := client.Create(&instance, "my@user")
+	err := client.Create(&instance, "my@user", "")
 	c.Assert(err, check.IsNil)
 	expectedURL := "/resources"
 	h.Lock()
@@ -140,7 +143,7 @@ func (s *S) TestCreateShouldSendTheNameOfTheResourceToTheEndpoint(c *check.C) {
 	defer ts.Close()
 	instance := ServiceInstance{Name: "my-redis", ServiceName: "redis", TeamOwner: "myteam"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	err := client.Create(&instance, "my@user")
+	err := client.Create(&instance, "my@user", "")
 	c.Assert(err, check.IsNil)
 	expectedURL := "/resources"
 	h.Lock()
@@ -167,7 +170,7 @@ func (s *S) TestCreateDuplicate(c *check.C) {
 	defer ts.Close()
 	instance := ServiceInstance{Name: "his-redis", ServiceName: "redis"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	err := client.Create(&instance, "my@user")
+	err := client.Create(&instance, "my@user", "")
 	c.Assert(err, check.Equals, ErrInstanceAlreadyExistsInAPI)
 }
 
@@ -176,7 +179,7 @@ func (s *S) TestCreateShouldReturnErrorIfTheRequestFail(c *check.C) {
 	defer ts.Close()
 	instance := ServiceInstance{Name: "his-redis", ServiceName: "redis"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	err := client.Create(&instance, "my@user")
+	err := client.Create(&instance, "my@user", "")
 	c.Assert(err, check.NotNil)
 	c.Assert(err, check.ErrorMatches, "^Failed to create the instance "+instance.Name+": Server failed to do its job.$")
 }
@@ -528,7 +531,7 @@ func (s *S) TestStatus(c *check.C) {
 	instance := ServiceInstance{Name: "my-redis", ServiceName: "redis"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
 	for _, t := range tests {
-		state, err := client.Status(&instance)
+		state, err := client.Status(&instance, "")
 		c.Check(err, check.IsNil)
 		c.Check(state, check.Equals, t.Expected)
 	}
@@ -540,7 +543,7 @@ func (s *S) TestInfo(c *check.C) {
 	defer ts.Close()
 	instance := ServiceInstance{Name: "my-redis", ServiceName: "redis"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	result, err := client.Info(&instance)
+	result, err := client.Info(&instance, "")
 	c.Assert(err, check.IsNil)
 	expected := []map[string]string{
 		{"label": "some label", "value": "some value"},
@@ -556,7 +559,7 @@ func (s *S) TestInfoNotFound(c *check.C) {
 	defer ts.Close()
 	instance := ServiceInstance{Name: "my-redis", ServiceName: "redis"}
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	result, err := client.Info(&instance)
+	result, err := client.Info(&instance, "")
 	c.Assert(err, check.IsNil)
 	c.Assert(result, check.IsNil)
 }
@@ -566,7 +569,7 @@ func (s *S) TestPlans(c *check.C) {
 	ts := httptest.NewServer(&h)
 	defer ts.Close()
 	client := &Client{endpoint: ts.URL, username: "user", password: "abcde"}
-	result, err := client.Plans()
+	result, err := client.Plans("")
 	c.Assert(err, check.IsNil)
 	expected := []Plan{
 		{Name: "ignite", Description: "some value"},

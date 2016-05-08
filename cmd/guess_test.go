@@ -1,4 +1,4 @@
-// Copyright 2015 tsuru authors. All rights reserved.
+// Copyright 2016 tsuru authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -109,12 +109,6 @@ func (s *S) TestGitGuesserWithTsuruRemoteNotMatchingTsuruPattern(c *check.C) {
 	c.Assert(name, check.Equals, "")
 	c.Assert(err, check.NotNil)
 	c.Assert(err.Error(), check.Equals, `"tsuru" remote did not match the pattern. Want something like <user>@<host>:<app-name>.git, got git://myhost.com/gopher.git`)
-}
-
-func (s *S) TestDirnameGuesser(c *check.C) {
-	name, err := DirnameGuesser{}.GuessName("/something/wat")
-	c.Assert(err, check.IsNil)
-	c.Assert(name, check.Equals, "wat")
 }
 
 func (s *S) TestGuessingCommandGuesserNil(c *check.C) {
