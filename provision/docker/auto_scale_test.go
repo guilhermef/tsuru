@@ -848,6 +848,7 @@ func (s *AutoScaleSuite) TestAutoScaleConfigRunMemoryBasedPlanTooBig(c *check.C)
 
 func (s *AutoScaleSuite) TestAutoScaleConfigRunScaleDown(c *check.C) {
 	config.Set("docker:auto-scale:max-container-count", 4)
+	defer config.Unset("docker:auto-scale:max-container-count")
 	otherUrl := fmt.Sprintf("http://localhost:%d/", dockertest.URLPort(s.node2.URL()))
 	node := cluster.Node{Address: otherUrl, Metadata: map[string]string{
 		"pool":     "pool1",
@@ -898,6 +899,7 @@ func (s *AutoScaleSuite) TestAutoScaleConfigRunScaleDown(c *check.C) {
 
 func (s *AutoScaleSuite) TestAutoScaleConfigRunScaleDownMultipleNodes(c *check.C) {
 	config.Set("docker:auto-scale:max-container-count", 5)
+	defer config.Unset("docker:auto-scale:max-container-count")
 	node1 := cluster.Node{Address: fmt.Sprintf("http://localhost:%d/", dockertest.URLPort(s.node2.URL())), Metadata: map[string]string{
 		"pool":     "pool1",
 		"iaas":     "my-scale-iaas",
@@ -1084,6 +1086,7 @@ func (s *AutoScaleSuite) TestAutoScaleConfigRunScaleDownMemoryScalerMultipleNode
 
 func (s *AutoScaleSuite) TestAutoScaleConfigRunScaleDownRespectsMinNodes(c *check.C) {
 	config.Set("docker:auto-scale:max-container-count", 4)
+	defer config.Unset("docker:auto-scale:max-container-count")
 	oldNodes, err := s.p.cluster.Nodes()
 	c.Assert(err, check.IsNil)
 	otherUrl := fmt.Sprintf("http://localhost:%d/", dockertest.URLPort(s.node2.URL()))
@@ -1302,6 +1305,7 @@ func (s *AutoScaleSuite) TestAutoScaleConfigRunOnceRulesPerPool(c *check.C) {
 
 func (s *S) TestAutoScaleConfigRunParamsError(c *check.C) {
 	config.Set("docker:auto-scale:max-container-count", 0)
+	defer config.Unset("docker:auto-scale:max-container-count")
 	a := autoScaleConfig{
 		done:            make(chan bool),
 		provisioner:     s.p,
@@ -1323,6 +1327,7 @@ func (s *S) TestAutoScaleConfigRunParamsError(c *check.C) {
 
 func (s *S) TestAutoScaleConfigRunDefaultValues(c *check.C) {
 	config.Set("docker:auto-scale:max-container-count", 10)
+	defer config.Unset("docker:auto-scale:max-container-count")
 	a := autoScaleConfig{
 		done:        make(chan bool),
 		provisioner: s.p,
@@ -1337,6 +1342,7 @@ func (s *S) TestAutoScaleConfigRunDefaultValues(c *check.C) {
 
 func (s *S) TestAutoScaleConfigRunConfigValues(c *check.C) {
 	config.Set("docker:auto-scale:max-container-count", 10)
+	defer config.Unset("docker:auto-scale:max-container-count")
 	config.Set("docker:auto-scale:scale-down-ratio", 1.5)
 	defer config.Unset("docker:auto-scale:scale-down-ratio")
 	a := autoScaleConfig{
