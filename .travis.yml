@@ -14,10 +14,6 @@ addons:
     packages:
       - rsyslog
       - xmlsec1
-before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y mongodb
-  - mongod --version
 before_script:
   - rsyslogd &
   - sleep 1
@@ -36,6 +32,7 @@ notifications:
 services:
   - redis
   - docker
+  - mongodb
 matrix:
   allow_failures:
     - go: tip
